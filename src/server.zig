@@ -1,25 +1,19 @@
 const std = @import("std");
 
+const c = @cImport({
+    @cInclude("wayland-server.h");
+});
+
 pub fn main() !void {
-    std.fs.deleteFileAbsolute("/tmp/wayland-experiment") catch {};
-    const address = try std.net.Address.initUnix("/tmp/wayland-experiment");
-    var server = try address.listen(.{ .kernel_backlog = 1 });
-    defer server.deinit();
-    std.debug.print("Server is listening\n", .{});
+    const display = c.wl_display_create() orelse return error.UnableToCreateDisplay;
+    defer c.wl_display_destroy(display);
 
-
-    var buffer: [1024]u8 = undefined;
-    buffer = std.mem.zeroes([1024]u8);
-
-    while (true) {
-        const connection = try server.accept();
-        std.debug.print("Client connected\n", .{});
-        while (true) {
-            const size = try connection.stream.read(&buffer);
-            if (size == 0) break;
-            std.debug.print("Received: {s}", .{buffer});
-            _ = try connection.stream.writeAll("I love you too!\n");
-        }
-        connection.stream.close();
+    const socket = c.wl_display_add_socket_auto(display);
+    if (socket[0] != 0) {
+        std.debug.print("Unable to add socket to Wayland display.\n", .{});
     }
+    std.debug.print("Running Wayland display on {s}\n", .{socket});
+    c.wl_display_run(display);
+
+    std.debug.print("Connection established\n", .{});
 }
